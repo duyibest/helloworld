@@ -17,6 +17,9 @@ export function isLoginURL(value) { return isANAURL(value) && /\/pages\/common\/
 export function isAwardURL(value) { return isANAURL(value) && /\/pages\/award\/search\/[^/]+\/[^/]+\.xhtml$/.test(new URL(value).pathname); }
 
 export function classifyObservation(observation) {
+  // A slow initial navigation can leave the fresh tab at about:blank.
+  // Keep waiting within the deadline; this is not an external redirect.
+  if (observation.url === 'about:blank') return 'pending';
   if (!isANAURL(observation.url)) return 'unexpected_page';
   if (observation.challenge || HUMAN.test(observation.text || '')) return 'needs_human';
   if (BLOCKED.test(observation.text || '')) return 'blocked';
@@ -24,6 +27,21 @@ export function classifyObservation(observation) {
   // A redirect or disappearing password field alone does not prove login success.
   if (isAwardURL(observation.url) && observation.logoutVisible && observation.passwordCount === 0 && observation.formInputs > 0) return 'authenticated';
   return 'pending';
+}
+
+export function safeLoginEvidence(observation) {
+  return {
+    page: observation.url === 'about:blank' ? 'not_loaded'
+      : isLoginURL(observation.url) ? 'login'
+      : isAwardURL(observation.url) ? 'award_search'
+      : isANAURL(observation.url) ? 'other_ana_page' : 'other_origin',
+    passwordVisible: observation.passwordCount > 0,
+    logoutVisible: observation.logoutVisible === true,
+    searchInputsPresent: observation.formInputs > 0,
+    humanVerification: observation.challenge === true || HUMAN.test(observation.text || ''),
+    credentialError: REJECTED.test(observation.text || ''),
+    blocked: BLOCKED.test(observation.text || ''),
+  };
 }
 
 async function bounded(promise, timeout = 1500) {
@@ -129,9 +147,12 @@ export async function loginOnce({ page, context, getCredentials, entryURL = ENTR
     credentials = undefined;
     onStage('verifying_login');
     const verifyDeadline = Date.now() + timeoutMs;
+    let lastVerification;
     while (Date.now() < verifyDeadline) {
       try {
-        const status = classifyObservation(await observe(page));
+        const observation = await observe(page);
+        lastVerification = safeLoginEvidence(observation);
+        const status = classifyObservation(observation);
         if (status === 'authenticated') {
           if (sessionFile) { onStage('saving_private_session'); await saveSession(context, sessionFile); }
           return { status, submitted, sessionSaved: !!sessionFile };
@@ -140,7 +161,7 @@ export async function loginOnce({ page, context, getCredentials, entryURL = ENTR
       } catch { /* Wait for a new document's execution context, within the deadline. */ }
       await pause(200);
     }
-    return { status: 'login_unverified', submitted };
+    return { status: 'login_unverified', submitted, evidence: lastVerification || { page: 'unobserved' } };
   } catch (error) {
     if (error instanceof SecretError) return { status: error.code, submitted };
     // Browser errors often include filled values or session URLs. Discard details.

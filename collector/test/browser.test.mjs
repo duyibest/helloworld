@@ -65,7 +65,7 @@ test('login browser contract using intercepted ANA-origin fixtures only', { time
       const s = await scenario({ secretError: 'secret_unavailable' }); assert.equal(s.outcome.status, 'secret_unavailable'); assert.equal(s.submits, 0);
     });
     await t.test('generic welcome page cannot claim success', async () => {
-      const s = await scenario({ result: 'ambiguous' }); assert.equal(s.outcome.status, 'login_unverified'); assert.equal(s.submits, 1);
+      const s = await scenario({ result: 'ambiguous' }); assert.equal(s.outcome.status, 'login_unverified'); assert.equal(s.submits, 1); assert.equal(s.outcome.evidence.page, 'other_ana_page');
     });
     await t.test('blank login page never reads credentials', async () => {
       const s = await scenario({ html: '<h1>Loading</h1>' }); assert.equal(s.outcome.status, 'login_not_ready'); assert.equal(s.reads, 0);

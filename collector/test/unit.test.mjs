@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCredentials, readCredentials, secretResource } from '../secrets.mjs';
-import { isANAURL, isLoginURL, classifyObservation } from '../login.mjs';
+import { isANAURL, isLoginURL, classifyObservation, safeLoginEvidence } from '../login.mjs';
 
 const fake = { ana_number: '0123456789', password: 'fixture-password-not-a-real-account' };
 const config = { project: 'yis-project-362902', secret: 'ana-award-credentials', version: '1', secretAuth: 'gcloud', gcloud: '/fixture/gcloud' };
@@ -37,6 +37,9 @@ test('credential references and destinations fail closed', () => {
   for (const url of ['http://aswbe-i.ana.co.jp/', 'https://aswbe-i.ana.co.jp.evil.test/', 'https://evil.test/', 'https://user:pass@aswbe-i.ana.co.jp/', 'https://aswbe-i.ana.co.jp:9999/']) assert.equal(isANAURL(url), false);
   assert(isLoginURL('https://aswbe-i.ana.co.jp/rei11d/international_asw/pages/common/login_standard.xhtml'));
 });
+test('a fresh blank tab remains pending without proving authentication', () => {
+  assert.equal(classifyObservation({ url: 'about:blank' }), 'pending');
+});
 test('neither a redirect nor an absent password proves authentication', () => {
   const o = { url: 'https://aswbe-i.ana.co.jp/rei11d/international_asw/pages/award/search/roundtrip/award_search_roundtrip_input.xhtml', logoutVisible: false, passwordCount: 0, formInputs: 3, text: '' };
   assert.equal(classifyObservation(o), 'pending');
@@ -44,4 +47,14 @@ test('neither a redirect nor an absent password proves authentication', () => {
   assert.equal(classifyObservation({ ...o, logoutVisible: true, text: 'Enter your verification code' }), 'needs_human');
   assert.equal(classifyObservation({ ...o, text: 'Incorrect password' }), 'login_rejected');
   assert.equal(classifyObservation({ ...o, url: 'https://evil.test/' }), 'unexpected_page');
+});
+
+test('post-login diagnostics contain booleans and page categories, never URLs or text', () => {
+  const observation = {
+    url: 'https://aswbe-i.ana.co.jp/rei11d/international_asw/pages/common/login_standard.xhtml?rdtk=fixture-session-token',
+    text: 'fixture-private-page-text', passwordCount: 1, logoutVisible: false, formInputs: 2,
+  };
+  const evidence = safeLoginEvidence(observation), serialized = JSON.stringify(evidence);
+  assert.equal(evidence.page, 'login'); assert.equal(evidence.passwordVisible, true);
+  for (const forbidden of ['fixture-session-token', 'fixture-private-page-text', 'https://', 'rdtk']) assert.equal(serialized.includes(forbidden), false);
 });

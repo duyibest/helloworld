@@ -11,7 +11,7 @@ and login state machine. They do **not** establish that ANA's current live form
 matches the expected layout or that unattended ANA login will work. An actual
 successful authenticated search still needs verification with the test account.
 
-The GCP secret `ana-award-credentials` currently needs an enabled version whose
+The GCP secret `ana-award-credentials` must have an enabled version whose
 value is JSON:
 
 ```json
@@ -77,7 +77,8 @@ The pilot:
 These recognition rules may need adjustment after inspecting the real login/search
 pages. A disappearing password field or generic Welcome page is not enough.
 
-Output contains only fixed stage/status names and the browser version. It never
+Output contains only fixed stage/status names, the browser version, and (for an
+unverified login) page categories and boolean UI markers. It never
 prints page text, full URLs, credential values, exceptions, or provider response
 bodies. No screenshots, network traces, HARs, or videos are recorded. Playwright
 interactive/debug logging is rejected because it can expose filled values.
