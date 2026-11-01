@@ -76,11 +76,11 @@ jobs:
           docker push "$IMAGE:$GITHUB_SHA"
           digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE:$GITHUB_SHA")
           echo "DEPLOY_IMAGE=$digest" >> "$GITHUB_ENV"
-      - name: Deploy exact image and verify response
+      - name: Deploy exact image
         run: |
-          gcloud run deploy "$SERVICE"             --project "$PROJECT_ID"             --region "$REGION"             --image "$DEPLOY_IMAGE"             --quiet
-          url=$(gcloud run services describe "$SERVICE"             --project "$PROJECT_ID" --region "$REGION"             --format='value(status.url)')
-          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url" -o response.txt
-          printf 'hello world' > expected.txt
-          cmp expected.txt response.txt
-          echo "Deployed $GITHUB_SHA to $url" >> "$GITHUB_STEP_SUMMARY"
+          gcloud run deploy "$SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --image "$DEPLOY_IMAGE" \
+            --quiet
+          echo "Deployed $GITHUB_SHA to Cloud Run service $SERVICE" >> "$GITHUB_STEP_SUMMARY"

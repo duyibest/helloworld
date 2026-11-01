@@ -1,6 +1,6 @@
 # Hello World
 
-A Go HTTP server that responds with exactly `hello world`.
+A Go HTTP server that responds with exactly `Hello world from GCP`.
 
 ## Local development
 
@@ -24,9 +24,9 @@ responses for pull requests targeting `main` and pushes to `main`.
 After the checks pass on a push to `main`, a separate deployment job builds the
 pure Go Linux binary with Bazel, packages it in a minimal non-root container,
 pushes a commit-tagged image to Artifact Registry, and deploys its immutable
-digest to the existing Cloud Run service. It verifies the public HTTP response
-after deployment. A failed post-deployment check marks the workflow failed; it
-does not automatically roll back the release.
+digest to the existing Cloud Run service. Deployment succeeds when the synchronous
+`gcloud run deploy` command succeeds; there is no post-deployment HTTP response
+comparison.
 
 Target: `yis-project-362902`, `us-west1`, Cloud Run service `helloworld`.
 The existing service's runtime identity, public access, scaling, and resource
