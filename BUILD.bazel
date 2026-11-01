@@ -1,9 +1,23 @@
-load("@rules_go//go:def.bzl", "go_binary")
+load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "server",
+    srcs = ["main.go", "awards.go", "storage.go"],
+    embedsrcs = glob(["web/*"]),
+    importpath = "example.com/helloworld",
+    visibility = ["//visibility:private"],
+)
 
 go_binary(
     name = "helloworld",
-    srcs = ["main.go"],
+    embed = [":server"],
     pure = "on",
-    importpath = "example.com/helloworld",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "server_test",
+    srcs = ["awards_test.go"],
+    embed = [":server"],
+    pure = "on",
 )

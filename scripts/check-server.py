@@ -1,4 +1,5 @@
 """Check the Bazel-built server on its default port and an alternate port."""
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -19,8 +20,14 @@ for port in (8080, 18080):
             try:
                 with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
                     assert response.status == 200
-                    assert response.headers.get_content_type() == "text/plain"
-                    assert response.read() == b"Hello world from remote Codex"
+                    assert response.headers.get_content_type() == "text/html"
+                    assert b"Pacific Seat" in response.read()
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=1) as response:
+                    assert response.read() == b"ok"
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/availability", timeout=1) as response:
+                    data = json.load(response)
+                    assert data["program"] == "ANA Mileage Club"
+                    assert isinstance(data["days"], list)
                 # Ensure a different server did not answer after ours failed to bind.
                 assert process.poll() is None, "Server exited unexpectedly"
                 print(f"PASS: HTTP response on port {port}")
