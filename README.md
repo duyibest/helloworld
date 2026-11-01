@@ -1,6 +1,6 @@
 # Hello World
 
-A Go HTTP server that responds with exactly `Hello world from GCP`.
+A Go HTTP server that responds with exactly `Hello world from remote Codex`.
 
 ## Local development
 

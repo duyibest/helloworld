@@ -20,7 +20,7 @@ for port in (8080, 18080):
                 with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
                     assert response.status == 200
                     assert response.headers.get_content_type() == "text/plain"
-                    assert response.read() == b"Hello world from GCP"
+                    assert response.read() == b"Hello world from remote Codex"
                 # Ensure a different server did not answer after ours failed to bind.
                 assert process.poll() is None, "Server exited unexpectedly"
                 print(f"PASS: HTTP response on port {port}")
