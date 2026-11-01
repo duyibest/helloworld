@@ -38,9 +38,30 @@ jobs:
       - name: Check default and configured HTTP ports
         run: python3 scripts/check-server.py
 
+  collector-check:
+    name: ANA collector tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: collector
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: collector/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx playwright install --with-deps --no-shell chromium
+      - run: npm test
+      - run: npm run test:browser
+
   deploy:
     name: Deploy to Cloud Run
-    needs: check
+    needs: [check, collector-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 20

@@ -47,3 +47,10 @@ shared `github-deploy` service account and `github-actions` identity pool.
 
 The minimal distroless container includes CA roots for outbound HTTPS; it runs as
 a non-root user. GCP data storage and scheduling are not yet provisioned.
+
+## ANA login pilot
+
+A separate [Secret Manager / Playwright login pilot](collector/README.md) is now
+available. It attempts login only and reports explicit outcomes; no flight-date
+collector or daily schedule is enabled by it. Live login success remains to be
+verified with an enabled test-account secret version.

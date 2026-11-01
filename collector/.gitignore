@@ -1,0 +1,7 @@
+node_modules/
+.auth/
+.env
+.env.*
+*.har
+*.zip
+*.png

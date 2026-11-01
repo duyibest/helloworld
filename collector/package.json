@@ -1,0 +1,16 @@
+{
+  "name": "ana-login-pilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "login": "node cli.mjs",
+    "test": "node --test test/unit.test.mjs",
+    "test:browser": "node --test test/browser.test.mjs"
+  },
+  "dependencies": {
+    "@google-cloud/secret-manager": "7.2.0",
+    "playwright": "1.64.1"
+  }
+}
