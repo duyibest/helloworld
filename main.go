@@ -17,7 +17,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		io.WriteString(w, "Hello world from GCP")
+		io.WriteString(w, "Hello world from remote Codex")
 	})
 	server := &http.Server{
 		Addr:              ":" + port,
