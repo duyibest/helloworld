@@ -26,13 +26,15 @@ jobs:
       - name: Check formatting
         shell: bash
         run: |
-          unformatted=$(gofmt -l main.go)
+          unformatted=$(gofmt -l *.go)
           if [[ -n "$unformatted" ]]; then
             echo "Run gofmt on: $unformatted"
             exit 1
           fi
       - name: Build with Bazel
         run: bazel build //:helloworld
+      - name: Test award filtering and HTTP handlers
+        run: bazel test //:server_test
       - name: Check default and configured HTTP ports
         run: python3 scripts/check-server.py
 

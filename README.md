@@ -1,86 +1,49 @@
-# Hello World
+# Pacific Seat — ANA award watch
 
-A Go HTTP server that responds with exactly `Hello world from remote Codex`.
+A Go website for ANA Mileage Club awards from SFO to Tokyo and Shanghai, deployed
+on the existing Cloud Run service. Pacific flights require ANA-operated business
+class; Tokyo → PVG may be business or economy. Waitlists are excluded.
 
-## Local development
+**Live collection is not connected.** The app starts with a truthful unsearched
+calendar. It does not fabricate award inventory. See [data-source setup and daily
+job design](docs/DATA-SOURCE.md) for the remaining authenticated ANA integration.
+
+## Develop in Ubuntu
 
 ```bash
+cd ~/code/helloworld
+bazel test //:server_test
 bazel build //:helloworld
 python3 scripts/check-server.py
 bazel run //:helloworld
 ```
 
-The default port is 8080. To choose another port:
+Open http://localhost:8080. Use `PORT=9090 bazel run //:helloworld` for a different
+port. Assets are embedded by Go and Bazel; no Node build or external fonts needed.
 
-```bash
-PORT=9090 bazel run //:helloworld
-```
+## Data
+
+`GET /api/availability?passengers=1` returns the current calendar, source state,
+coverage, and qualifying itineraries. `GET /healthz` is a process health check;
+it intentionally does not claim the collector is healthy.
+
+For development, set `SNAPSHOT_FILE` to a normalized snapshot following the
+[contract](docs/DATA-SOURCE.md). In Cloud Run set `SNAPSHOT_BUCKET` after a private
+bucket and scoped IAM are provisioned. No snapshot configuration means no source.
+The public API is read-only. There is no public refresh or import endpoint.
+
+The `refresh` command imports a validated snapshot from an authorized HTTPS
+adapter; it does not log into or scrape ANA. Collection is a separate prerequisite.
 
 ## CI/CD
 
-`.github/workflows/ci.yml` checks formatting, builds with Bazel, and verifies HTTP
-responses for pull requests targeting `main` and pushes to `main`.
+GitHub Actions checks Go formatting, builds with Bazel, tests eligibility and
+HTTP handling, and smoke-tests the server on default and custom ports. After a
+merge to main it builds the container, pushes an immutable image, and deploys to
+`helloworld` in project `yis-project-362902`, region `us-west1`.
+Deployment success is determined by `gcloud run deploy`, without comparing page
+content to an expected text file. Workflow authentication uses the existing
+shared `github-deploy` service account and `github-actions` identity pool.
 
-After the checks pass on a push to `main`, a separate deployment job builds the
-pure Go Linux binary with Bazel, packages it in a minimal non-root container,
-pushes a commit-tagged image to Artifact Registry, and deploys its immutable
-digest to the existing Cloud Run service. Deployment succeeds when the synchronous
-`gcloud run deploy` command succeeds; there is no post-deployment HTTP response
-comparison.
-
-Target: `yis-project-362902`, `us-west1`, Cloud Run service `helloworld`.
-The existing service's runtime identity, public access, scaling, and resource
-settings are retained. Cloud Build is not used by this workflow.
-
-### One-time Google Cloud setup
-
-The project uses a shared deployment account and identity pool, reusable by
-explicitly approved repositories. Initially, only `duyibest/helloworld` is trusted.
-Adding a repository later requires updating the provider allowlist and the
-service account's federation binding; sharing the account does not automatically
-trust all repositories owned by duyibest.
-
-An administrator must configure these resources before merging this workflow:
-
-- Service account: `github-deploy@yis-project-362902.iam.gserviceaccount.com`.
-- Workload identity pool: `github-actions`, provider `github`.
-- Trust GitHub OIDC only for repository ID `1442041287`, owner ID `32662916`,
-  push events on `refs/heads/main`, and workflow
-  `duyibest/helloworld/.github/workflows/ci.yml@refs/heads/main`.
-- Grant the matching federated repository identity `roles/iam.workloadIdentityUser`
-  on that deployment service account.
-- Grant the deployment account `roles/artifactregistry.writer` on the existing
-  `us-west1/cloud-run-source-deploy` repository.
-- Grant it `roles/run.developer` on the existing `helloworld` service.
-- Grant it `roles/iam.serviceAccountUser` on the service's existing runtime account,
-  `337849585342-compute@developer.gserviceaccount.com`.
-- Enable IAM, IAM Service Account Credentials, and Security Token Service APIs.
-
-All allowed repositories share the deployment account's granted permissions.
-Initially, Cloud Run access is scoped to the existing `helloworld` service;
-Artifact Registry access covers all images in `cloud-run-source-deploy`.
-`roles/iam.serviceAccountUser` lets deployed code execute with the existing runtime
-account's permissions. This setup does not add project-wide Editor, Owner,
-Cloud Run Admin, or Service Account Token Creator roles. It does not grant the
-deployment account permission to modify IAM policy.
-
-No service-account keys or GitHub repository secrets are required. Anyone able to
-merge workflow changes into main can exercise these deployment permissions.
-
-### Container build locally (optional)
-
-Docker is needed only for this optional local command; GitHub runners include it.
-
-```bash
-bazel build //:helloworld
-mkdir -p dist
-cp bazel-bin/helloworld_/helloworld dist/helloworld
-docker build -t helloworld .
-docker run --rm -p 8080:8080 helloworld
-```
-
-### GitHub settings
-
-After CI has run, optionally add a main-branch ruleset requiring the
-`Format, build, and HTTP checks` status before merge. The workflow itself does
-not enforce a merge restriction.
+The minimal distroless container includes CA roots for outbound HTTPS; it runs as
+a non-root user. GCP data storage and scheduling are not yet provisioned.
