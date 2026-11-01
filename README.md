@@ -34,10 +34,16 @@ settings are retained. Cloud Build is not used by this workflow.
 
 ### One-time Google Cloud setup
 
+The project uses a shared deployment account and identity pool, reusable by
+explicitly approved repositories. Initially, only `duyibest/helloworld` is trusted.
+Adding a repository later requires updating the provider allowlist and the
+service account's federation binding; sharing the account does not automatically
+trust all repositories owned by duyibest.
+
 An administrator must configure these resources before merging this workflow:
 
-- Service account: `helloworld-github-deploy@yis-project-362902.iam.gserviceaccount.com`.
-- Workload identity pool: `helloworld-github`, provider `github`.
+- Service account: `github-deploy@yis-project-362902.iam.gserviceaccount.com`.
+- Workload identity pool: `github-actions`, provider `github`.
 - Trust GitHub OIDC only for repository ID `1442041287`, owner ID `32662916`,
   push events on `refs/heads/main`, and workflow
   `duyibest/helloworld/.github/workflows/ci.yml@refs/heads/main`.
@@ -49,6 +55,14 @@ An administrator must configure these resources before merging this workflow:
 - Grant it `roles/iam.serviceAccountUser` on the service's existing runtime account,
   `337849585342-compute@developer.gserviceaccount.com`.
 - Enable IAM, IAM Service Account Credentials, and Security Token Service APIs.
+
+All allowed repositories share the deployment account's granted permissions.
+Initially, Cloud Run access is scoped to the existing `helloworld` service;
+Artifact Registry access covers all images in `cloud-run-source-deploy`.
+`roles/iam.serviceAccountUser` lets deployed code execute with the existing runtime
+account's permissions. This setup does not add project-wide Editor, Owner,
+Cloud Run Admin, or Service Account Token Creator roles. It does not grant the
+deployment account permission to modify IAM policy.
 
 No service-account keys or GitHub repository secrets are required. Anyone able to
 merge workflow changes into main can exercise these deployment permissions.
