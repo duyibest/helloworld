@@ -1,1 +1,4 @@
 /bazel-*
+
+/dist/
+/gha-creds-*.json

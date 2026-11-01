@@ -1,0 +1,86 @@
+name: CI and deploy
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, build, and HTTP checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - uses: bazel-contrib/setup-bazel@104e3eea9447cdaa4b00d0fb46191a3985d26ab3 # 0.19.1
+      - name: Check formatting
+        shell: bash
+        run: |
+          unformatted=$(gofmt -l main.go)
+          if [[ -n "$unformatted" ]]; then
+            echo "Run gofmt on: $unformatted"
+            exit 1
+          fi
+      - name: Build with Bazel
+        run: bazel build //:helloworld
+      - name: Check default and configured HTTP ports
+        run: python3 scripts/check-server.py
+
+  deploy:
+    name: Deploy to Cloud Run
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: cloud-run-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT_ID: yis-project-362902
+      REGION: us-west1
+      SERVICE: helloworld
+      IMAGE: us-west1-docker.pkg.dev/yis-project-362902/cloud-run-source-deploy/helloworld
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: bazel-contrib/setup-bazel@104e3eea9447cdaa4b00d0fb46191a3985d26ab3 # 0.19.1
+      - name: Build Linux binary and container
+        run: |
+          bazel build //:helloworld
+          mkdir -p dist
+          cp bazel-bin/helloworld_/helloworld dist/helloworld
+          docker build --platform linux/amd64 -t "$IMAGE:$GITHUB_SHA" .
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: projects/337849585342/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-deploy@yis-project-362902.iam.gserviceaccount.com
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - name: Push release image
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker push "$IMAGE:$GITHUB_SHA"
+          digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE:$GITHUB_SHA")
+          echo "DEPLOY_IMAGE=$digest" >> "$GITHUB_ENV"
+      - name: Deploy exact image and verify response
+        run: |
+          gcloud run deploy "$SERVICE"             --project "$PROJECT_ID"             --region "$REGION"             --image "$DEPLOY_IMAGE"             --quiet
+          url=$(gcloud run services describe "$SERVICE"             --project "$PROJECT_ID" --region "$REGION"             --format='value(status.url)')
+          curl --fail --silent --show-error --retry 5 --retry-all-errors "$url" -o response.txt
+          printf 'hello world' > expected.txt
+          cmp expected.txt response.txt
+          echo "Deployed $GITHUB_SHA to $url" >> "$GITHUB_STEP_SUMMARY"
