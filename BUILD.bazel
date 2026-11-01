@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_binary")
+
+go_binary(
+    name = "helloworld",
+    srcs = ["main.go"],
+    pure = "on",
+    importpath = "example.com/helloworld",
+    visibility = ["//visibility:public"],
+)
